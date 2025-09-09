@@ -34,12 +34,11 @@ import httpx
 # Add the api directory to the path to import models
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Configure logging
+# Configure logging (stdout only to avoid permission issues in container)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('data_generation.log', mode='w'),
         logging.StreamHandler()
     ]
 )
