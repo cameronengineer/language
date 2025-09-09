@@ -22,7 +22,15 @@ echo "   - API Base URL: $API_BASE_URL"
 
 # Function to check if API is ready
 check_api_ready() {
-    curl -f -s "$API_BASE_URL/health" > /dev/null 2>&1
+    python -c "
+import httpx
+import sys
+try:
+    response = httpx.get('$API_BASE_URL/health', timeout=5)
+    sys.exit(0 if response.status_code == 200 else 1)
+except Exception:
+    sys.exit(1)
+" > /dev/null 2>&1
 }
 
 # Function to wait for API to be ready

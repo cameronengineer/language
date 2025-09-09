@@ -80,7 +80,8 @@ def update_language(
     
     # Update with only the fields that were set
     language_data = language_update.model_dump(exclude_unset=True)
-    language.sqlmodel_update(language_data)
+    for key, value in language_data.items():
+        setattr(language, key, value)
     session.add(language)
     session.commit()
     session.refresh(language)

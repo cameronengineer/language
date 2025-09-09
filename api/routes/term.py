@@ -88,7 +88,8 @@ def update_term(
     
     # Update with only the fields that were set
     term_data = term_update.model_dump(exclude_unset=True)
-    term.sqlmodel_update(term_data)
+    for key, value in term_data.items():
+        setattr(term, key, value)
     session.add(term)
     session.commit()
     session.refresh(term)

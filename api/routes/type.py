@@ -80,7 +80,8 @@ def update_type(
     
     # Update with only the fields that were set
     type_data = type_update.model_dump(exclude_unset=True)
-    type_obj.sqlmodel_update(type_data)
+    for key, value in type_data.items():
+        setattr(type_obj, key, value)
     session.add(type_obj)
     session.commit()
     session.refresh(type_obj)

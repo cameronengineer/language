@@ -112,7 +112,8 @@ def update_user(
             raise HTTPException(status_code=400, detail="Email already exists")
     
     # Update user with the data
-    user.sqlmodel_update(user_data)
+    for key, value in user_data.items():
+        setattr(user, key, value)
     session.add(user)
     session.commit()
     session.refresh(user)

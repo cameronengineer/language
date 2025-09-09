@@ -76,7 +76,8 @@ def update_catalogue(
     
     # Update with only the fields that were set
     catalogue_data = catalogue_update.model_dump(exclude_unset=True)
-    catalogue.sqlmodel_update(catalogue_data)
+    for key, value in catalogue_data.items():
+        setattr(catalogue, key, value)
     session.add(catalogue)
     session.commit()
     session.refresh(catalogue)

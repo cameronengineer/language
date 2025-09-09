@@ -92,7 +92,8 @@ def update_translation(
     try:
         # Update with only the fields that were set
         translation_data = translation_update.model_dump(exclude_unset=True)
-        translation.sqlmodel_update(translation_data)
+        for key, value in translation_data.items():
+            setattr(translation, key, value)
         session.add(translation)
         session.commit()
         session.refresh(translation)
