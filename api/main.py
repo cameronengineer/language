@@ -98,9 +98,7 @@ def read_root():
         "message": "Welcome to the Language Learning API",
         "version": settings.api_version,
         "docs": "/docs",
-        "redoc": "/redoc",
-        "authentication": "Social login enabled",
-        "security": "Rate limiting and security headers active"
+        "redoc": "/redoc"
     }
 
 
@@ -108,8 +106,5 @@ def read_root():
 def health_check():
     """Health check endpoint"""
     return {
-        "status": "healthy",
-        "authentication": "enabled",
-        "security": "active",
-        "features": ["JWT", "Social Login", "Rate Limiting", "Security Headers"]
+        "status": "healthy"
     }
