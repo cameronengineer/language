@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import select
 from database import SessionDep, get_session
 from models.language import Language, LanguageCreate, LanguagePublic, LanguageUpdate
+from models.user import User
+from auth.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/languages",
@@ -15,10 +17,11 @@ router = APIRouter(
 @router.get("/", response_model=List[LanguagePublic])
 def read_languages(
     session: SessionDep,
+    current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 100
 ):
-    """Get all languages"""
+    """Get all languages - requires authentication"""
     languages = session.exec(select(Language).offset(skip).limit(limit)).all()
     return languages
 
@@ -26,9 +29,10 @@ def read_languages(
 @router.get("/{language_id}", response_model=LanguagePublic)
 def read_language(
     language_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific language by ID"""
+    """Get a specific language by ID - requires authentication"""
     language = session.get(Language, language_id)
     if not language:
         raise HTTPException(status_code=404, detail="Language not found")
@@ -38,9 +42,10 @@ def read_language(
 @router.get("/code/{code}", response_model=LanguagePublic)
 def read_language_by_code(
     code: str,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific language by ISO code"""
+    """Get a specific language by ISO code - requires authentication"""
     statement = select(Language).where(Language.code == code)
     language = session.exec(statement).first()
     if not language:
@@ -51,9 +56,10 @@ def read_language_by_code(
 @router.post("/", response_model=LanguagePublic)
 def create_language(
     language: LanguageCreate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Create a new language"""
+    """Create a new language - requires authentication"""
     # Check if language with code already exists
     existing = session.exec(select(Language).where(Language.code == language.code)).first()
     if existing:
@@ -71,9 +77,10 @@ def create_language(
 def update_language(
     language_id: uuid.UUID,
     language_update: LanguageUpdate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Update a language"""
+    """Update a language - requires authentication"""
     language = session.get(Language, language_id)
     if not language:
         raise HTTPException(status_code=404, detail="Language not found")
@@ -91,9 +98,10 @@ def update_language(
 @router.delete("/{language_id}")
 def delete_language(
     language_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Delete a language"""
+    """Delete a language - requires authentication"""
     language = session.get(Language, language_id)
     if not language:
         raise HTTPException(status_code=404, detail="Language not found")

@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import select
 from database import SessionDep, get_session
 from models.term import Term, TermCreate, TermPublic, TermUpdate
+from models.user import User
+from auth.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/terms",
@@ -15,12 +17,13 @@ router = APIRouter(
 @router.get("/", response_model=List[TermPublic])
 def read_terms(
     session: SessionDep,
+    current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 100,
     language_id: Optional[uuid.UUID] = None,
     type_id: Optional[uuid.UUID] = None
 ):
-    """Get all terms with optional filtering"""
+    """Get all terms with optional filtering - requires authentication"""
     statement = select(Term)
     
     if language_id:
@@ -36,9 +39,10 @@ def read_terms(
 @router.get("/{term_id}", response_model=TermPublic)
 def read_term(
     term_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific term by ID"""
+    """Get a specific term by ID - requires authentication"""
     term = session.get(Term, term_id)
     if not term:
         raise HTTPException(status_code=404, detail="Term not found")
@@ -49,9 +53,10 @@ def read_term(
 def search_terms(
     search_term: str,
     session: SessionDep,
+    current_user: User = Depends(get_current_user),
     language_id: Optional[uuid.UUID] = None
 ):
-    """Search for terms by partial match"""
+    """Search for terms by partial match - requires authentication"""
     statement = select(Term).where(Term.text.contains(search_term))
     
     if language_id:
@@ -64,9 +69,10 @@ def search_terms(
 @router.post("/", response_model=TermPublic)
 def create_term(
     term: TermCreate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Create a new term"""
+    """Create a new term - requires authentication"""
     # Create the term using model_validate
     db_term = Term.model_validate(term)
     session.add(db_term)
@@ -79,9 +85,10 @@ def create_term(
 def update_term(
     term_id: uuid.UUID,
     term_update: TermUpdate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Update a term"""
+    """Update a term - requires authentication"""
     term = session.get(Term, term_id)
     if not term:
         raise HTTPException(status_code=404, detail="Term not found")
@@ -99,9 +106,10 @@ def update_term(
 @router.delete("/{term_id}")
 def delete_term(
     term_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Delete a term"""
+    """Delete a term - requires authentication"""
     term = session.get(Term, term_id)
     if not term:
         raise HTTPException(status_code=404, detail="Term not found")

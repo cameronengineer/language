@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import select
 from database import SessionDep, get_session
 from models.type import Type, TypeCreate, TypePublic, TypeUpdate
+from models.user import User
+from auth.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/types",
@@ -15,10 +17,11 @@ router = APIRouter(
 @router.get("/", response_model=List[TypePublic])
 def read_types(
     session: SessionDep,
+    current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 100
 ):
-    """Get all types"""
+    """Get all types - requires authentication"""
     types = session.exec(select(Type).offset(skip).limit(limit)).all()
     return types
 
@@ -26,9 +29,10 @@ def read_types(
 @router.get("/{type_id}", response_model=TypePublic)
 def read_type(
     type_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific type by ID"""
+    """Get a specific type by ID - requires authentication"""
     type_obj = session.get(Type, type_id)
     if not type_obj:
         raise HTTPException(status_code=404, detail="Type not found")
@@ -38,9 +42,10 @@ def read_type(
 @router.get("/name/{name}", response_model=TypePublic)
 def read_type_by_name(
     name: str,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific type by name"""
+    """Get a specific type by name - requires authentication"""
     statement = select(Type).where(Type.name == name)
     type_obj = session.exec(statement).first()
     if not type_obj:
@@ -51,9 +56,10 @@ def read_type_by_name(
 @router.post("/", response_model=TypePublic)
 def create_type(
     type_create: TypeCreate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Create a new type"""
+    """Create a new type - requires authentication"""
     # Check if type with name already exists
     existing = session.exec(select(Type).where(Type.name == type_create.name)).first()
     if existing:
@@ -71,9 +77,10 @@ def create_type(
 def update_type(
     type_id: uuid.UUID,
     type_update: TypeUpdate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Update a type"""
+    """Update a type - requires authentication"""
     type_obj = session.get(Type, type_id)
     if not type_obj:
         raise HTTPException(status_code=404, detail="Type not found")
@@ -91,9 +98,10 @@ def update_type(
 @router.delete("/{type_id}")
 def delete_type(
     type_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Delete a type"""
+    """Delete a type - requires authentication"""
     type_obj = session.get(Type, type_id)
     if not type_obj:
         raise HTTPException(status_code=404, detail="Type not found")

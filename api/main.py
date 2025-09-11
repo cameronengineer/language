@@ -3,14 +3,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from database import create_db_and_tables
+from core.config import settings
+from middleware.rate_limiting import RateLimitMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
 from routes import (
     language_router,
     type_router,
     term_router,
     user_router,
     translation_router,
-    catalogue_router
+    catalogue_router,
+    study_session_router,
+    user_study_session_router
 )
+from routes.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -22,6 +28,7 @@ async def lifespan(app: FastAPI):
     # Startup
     create_db_and_tables()
     print("Database tables created")
+    print("JWT Authentication enabled")
     yield
     # Shutdown
     print("Shutting down")
@@ -29,28 +36,35 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Language Learning API",
-    description="API for managing language learning terms and translations",
-    version="1.0.0",
+    title=settings.api_title,
+    description=settings.api_description,
+    version=settings.api_version,
     lifespan=lifespan
 )
+
+# Add security middleware (order matters - add before CORS)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
+app.include_router(auth_router)  # Add auth routes first
 app.include_router(language_router)
 app.include_router(type_router)
 app.include_router(term_router)
 app.include_router(user_router)
 app.include_router(translation_router)
 app.include_router(catalogue_router)
+app.include_router(study_session_router)
+app.include_router(user_study_session_router)
 
 
 @app.get("/")
@@ -58,13 +72,20 @@ def read_root():
     """Root endpoint"""
     return {
         "message": "Welcome to the Language Learning API",
-        "version": "1.0.0",
+        "version": settings.api_version,
         "docs": "/docs",
-        "redoc": "/redoc"
+        "redoc": "/redoc",
+        "authentication": "Social login enabled",
+        "security": "Rate limiting and security headers active"
     }
 
 
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "authentication": "enabled",
+        "security": "active",
+        "features": ["JWT", "Social Login", "Rate Limiting", "Security Headers"]
+    }

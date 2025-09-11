@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import select
 from database import SessionDep, get_session
 from models.catalogue import Catalogue, CatalogueCreate, CataloguePublic, CatalogueUpdate
+from models.user import User
+from auth.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/catalogues",
@@ -15,10 +17,11 @@ router = APIRouter(
 @router.get("/", response_model=List[CataloguePublic])
 def read_catalogues(
     session: SessionDep,
+    current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 100
 ):
-    """Get all catalogues"""
+    """Get all catalogues - requires authentication"""
     catalogues = session.exec(select(Catalogue).offset(skip).limit(limit)).all()
     return catalogues
 
@@ -26,9 +29,10 @@ def read_catalogues(
 @router.get("/{catalogue_id}", response_model=CataloguePublic)
 def read_catalogue(
     catalogue_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific catalogue by ID"""
+    """Get a specific catalogue by ID - requires authentication"""
     catalogue = session.get(Catalogue, catalogue_id)
     if not catalogue:
         raise HTTPException(status_code=404, detail="Catalogue not found")
@@ -38,9 +42,10 @@ def read_catalogue(
 @router.get("/search/{search_term}", response_model=List[CataloguePublic])
 def search_catalogues(
     search_term: str,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Search catalogues by name or description"""
+    """Search catalogues by name or description - requires authentication"""
     statement = select(Catalogue).where(
         (Catalogue.name.contains(search_term)) |
         (Catalogue.description.contains(search_term))
@@ -52,9 +57,10 @@ def search_catalogues(
 @router.post("/", response_model=CataloguePublic)
 def create_catalogue(
     catalogue: CatalogueCreate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Create a new catalogue"""
+    """Create a new catalogue - requires authentication"""
     # Create the catalogue using model_validate
     db_catalogue = Catalogue.model_validate(catalogue)
     session.add(db_catalogue)
@@ -67,9 +73,10 @@ def create_catalogue(
 def update_catalogue(
     catalogue_id: uuid.UUID,
     catalogue_update: CatalogueUpdate,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Update a catalogue"""
+    """Update a catalogue - requires authentication"""
     catalogue = session.get(Catalogue, catalogue_id)
     if not catalogue:
         raise HTTPException(status_code=404, detail="Catalogue not found")
@@ -87,9 +94,10 @@ def update_catalogue(
 @router.delete("/{catalogue_id}")
 def delete_catalogue(
     catalogue_id: uuid.UUID,
-    session: SessionDep
+    session: SessionDep,
+    current_user: User = Depends(get_current_user)
 ):
-    """Delete a catalogue"""
+    """Delete a catalogue - requires authentication"""
     catalogue = session.get(Catalogue, catalogue_id)
     if not catalogue:
         raise HTTPException(status_code=404, detail="Catalogue not found")
