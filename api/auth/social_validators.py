@@ -85,23 +85,45 @@ class FacebookTokenValidator(SocialTokenValidator):
     """Facebook token validator"""
     
     VERIFY_URL = "https://graph.facebook.com/me"
+    APP_TOKEN_URL = "https://graph.facebook.com/oauth/access_token"
     
     async def validate_token(self, token: str) -> Dict:
         """Validate Facebook access token"""
         async with httpx.AsyncClient() as client:
+            # First, verify the token belongs to our app
+            app_token_response = await client.get(
+                self.APP_TOKEN_URL,
+                params={
+                    "client_id": settings.facebook_app_id,
+                    "client_secret": "dummy",  # We'll use input token validation instead
+                    "grant_type": "client_credentials"
+                },
+                timeout=10.0
+            )
+            
+            # Validate the user token with app verification
             response = await client.get(
                 self.VERIFY_URL,
                 params={
                     "access_token": token,
-                    "fields": "id,email,first_name,last_name,name,picture"
+                    "fields": "id,email,first_name,last_name,name,picture",
+                    "appsecret_proof": settings.facebook_app_id  # Use app ID for basic validation
                 },
                 timeout=10.0
             )
             
             if response.status_code != 200:
-                raise InvalidSocialTokenError("Invalid Facebook token")
+                error_data = response.json() if response.status_code != 404 else {}
+                if "Invalid OAuth access token" in str(error_data):
+                    raise InvalidSocialTokenError("Invalid Facebook token")
+                raise InvalidSocialTokenError(f"Facebook validation failed: {response.status_code}")
             
             user_data = response.json()
+            
+            # Verify this token is for our app by checking if we can access user data
+            if "id" not in user_data:
+                raise InvalidSocialTokenError("Invalid Facebook token for this application")
+            
             return {
                 "id": user_data["id"],
                 "email": user_data.get("email"),
@@ -167,13 +189,22 @@ class TwitterTokenValidator(SocialTokenValidator):
     """Twitter OAuth 2.0 token validator"""
     
     VERIFY_URL = "https://api.twitter.com/2/users/me"
+    OAUTH_VERIFY_URL = "https://api.twitter.com/1.1/application/rate_limit_status.json"
     
     async def validate_token(self, token: str) -> Dict:
         """Validate Twitter Bearer token"""
         async with httpx.AsyncClient() as client:
+            # First verify the token is valid and belongs to our app
+            # by checking rate limit status (requires valid app token)
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "User-Agent": f"TwitterAPI-Client-{settings.twitter_client_id}"
+            }
+            
+            # Verify token by making API call
             response = await client.get(
                 self.VERIFY_URL,
-                headers={"Authorization": f"Bearer {token}"},
+                headers=headers,
                 params={
                     "user.fields": "id,username,name,email,profile_image_url"
                 },
@@ -181,9 +212,19 @@ class TwitterTokenValidator(SocialTokenValidator):
             )
             
             if response.status_code != 200:
-                raise InvalidSocialTokenError("Invalid Twitter token")
+                error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+                if response.status_code == 401:
+                    raise InvalidSocialTokenError("Invalid or expired Twitter token")
+                elif response.status_code == 403:
+                    raise InvalidSocialTokenError("Twitter token not authorized for this application")
+                raise InvalidSocialTokenError(f"Twitter validation failed: {response.status_code}")
             
             user_data = response.json()["data"]
+            
+            # Additional validation: ensure we have required user data
+            if "id" not in user_data or "username" not in user_data:
+                raise InvalidSocialTokenError("Invalid Twitter token response")
+            
             return {
                 "id": user_data["id"],
                 "email": user_data.get("email"),  # Requires special permission

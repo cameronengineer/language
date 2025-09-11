@@ -7,17 +7,13 @@ class SocialProvider(str, Enum):
     FACEBOOK = "facebook"
     APPLE = "apple"
     TWITTER = "twitter"
+    MOCK = "mock"  # For testing
 
-class LanguagePreference(BaseModel):
-    """Language preference for new user setup"""
-    native_language_code: str = Field("en", description="ISO language code for native language")
-    study_language_code: str = Field("es", description="ISO language code for study language")
 
-class SocialLoginRequest(BaseModel):
-    """Request schema for social login"""
+class SimpleSocialLoginRequest(BaseModel):
+    """Simplified request schema for social login"""
     provider: SocialProvider
     token: str = Field(..., description="Access token or ID token from social provider")
-    language_preferences: LanguagePreference | None = None
 
 class TokenResponse(BaseModel):
     """Response schema for successful social login"""
@@ -39,5 +35,7 @@ class TokenRefreshResponse(BaseModel):
     expires_in: int
 
 class UserWithProvider(UserPublic):
-    """User with linked social provider info"""
-    primary_provider: str | None = None  # Most recently used provider
+    """User with social provider info"""
+    provider: str
+    provider_username: str | None = None
+    provider_name: str | None = None

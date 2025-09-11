@@ -4,7 +4,7 @@ import re
 from typing import Tuple, Dict
 from datetime import datetime
 from sqlmodel import Session, select
-from models import User, SocialAccount, Language
+from models import User, Language
 from auth.social_validators import validate_social_token
 
 class UserService:
@@ -16,8 +16,7 @@ class UserService:
     async def create_or_get_user_from_social(
         self,
         provider: str,
-        token: str,
-        language_preferences: Dict = None
+        token: str
     ) -> Tuple[User, bool]:
         """
         Create new user or return existing user from social login
@@ -26,47 +25,30 @@ class UserService:
         # 1. Validate token with social provider
         provider_data = await validate_social_token(provider, token)
         
-        # 2. Check if social account already exists
-        existing_social = self.session.exec(
-            select(SocialAccount).where(
-                SocialAccount.provider == provider,
-                SocialAccount.provider_user_id == provider_data['id']
+        # 2. Check if user already exists with this provider and provider_user_id
+        existing_user = self.session.exec(
+            select(User).where(
+                User.provider == provider,
+                User.provider_user_id == provider_data['id']
             )
         ).first()
         
-        if existing_social:
+        if existing_user:
             # Update last login and return existing user
-            existing_social.user.last_login = datetime.utcnow()
-            self.session.add(existing_social.user)
+            existing_user.last_login = datetime.utcnow()
+            self.session.add(existing_user)
             self.session.commit()
-            return existing_social.user, False
+            return existing_user, False
         
-        # 3. Check if user with email exists (link social account)
-        if provider_data.get('email'):
-            existing_user = self.session.exec(
-                select(User).where(User.email == provider_data['email'])
-            ).first()
-            
-            if existing_user:
-                # Link new social account to existing user
-                social_account = SocialAccount(
-                    user_id=existing_user.id,
-                    provider=provider,
-                    provider_user_id=provider_data['id'],
-                    provider_email=provider_data['email'],
-                    provider_username=provider_data.get('username'),
-                    provider_name=provider_data.get('name'),
-                    raw_data=json.dumps(provider_data)
-                )
-                self.session.add(social_account)
-                existing_user.last_login = datetime.utcnow()
-                self.session.add(existing_user)
-                self.session.commit()
-                return existing_user, False
-        
-        # 4. Create new user
+        # 3. Create new user (no account linking - one provider per user)
         username = await self._generate_unique_username(provider_data)
-        language_prefs = await self._prepare_language_preferences(language_preferences or {})
+        
+        # Get default language IDs (English native, Spanish study)
+        english_lang = self.session.exec(select(Language).where(Language.code == "en")).first()
+        spanish_lang = self.session.exec(select(Language).where(Language.code == "es")).first()
+        
+        if not english_lang or not spanish_lang:
+            raise ValueError("Required default languages (English and Spanish) not found in database")
         
         user_data = {
             'email': provider_data.get('email', f"{username}@{provider}.local"),
@@ -75,24 +57,18 @@ class UserService:
             'username': username,
             'profile_picture_url': provider_data.get('picture'),
             'last_login': datetime.utcnow(),
-            **language_prefs
+            'provider': provider,
+            'provider_user_id': provider_data['id'],
+            'provider_email': provider_data.get('email'),
+            'provider_username': provider_data.get('username'),
+            'provider_name': provider_data.get('name'),
+            'raw_data': json.dumps(provider_data),
+            'native_language_id': english_lang.id,
+            'study_language_id': spanish_lang.id
         }
         
         user = User(**user_data)
         self.session.add(user)
-        self.session.flush()  # Get user.id
-        
-        # 5. Create social account record
-        social_account = SocialAccount(
-            user_id=user.id,
-            provider=provider,
-            provider_user_id=provider_data['id'],
-            provider_email=provider_data.get('email'),
-            provider_username=provider_data.get('username'),
-            provider_name=provider_data.get('name'),
-            raw_data=json.dumps(provider_data)
-        )
-        self.session.add(social_account)
         self.session.commit()
         self.session.refresh(user)
         
@@ -122,36 +98,3 @@ class UserService:
         
         return username
     
-    async def _prepare_language_preferences(self, preferences: Dict) -> Dict:
-        """Prepare language preferences with default fallbacks"""
-        native_code = preferences.get('native_language_code', 'en')
-        study_code = preferences.get('study_language_code', 'es')
-        
-        # Get language IDs from codes
-        native_lang = self.session.exec(
-            select(Language).where(Language.code == native_code)
-        ).first()
-        
-        study_lang = self.session.exec(
-            select(Language).where(Language.code == study_code)
-        ).first()
-        
-        if not native_lang:
-            # Default to English
-            native_lang = self.session.exec(
-                select(Language).where(Language.code == "en")
-            ).first()
-        
-        if not study_lang:
-            # Default to Spanish  
-            study_lang = self.session.exec(
-                select(Language).where(Language.code == "es")
-            ).first()
-        
-        if not native_lang or not study_lang:
-            raise ValueError("Required default languages not found in database")
-        
-        return {
-            "native_language_id": native_lang.id,
-            "study_language_id": study_lang.id
-        }

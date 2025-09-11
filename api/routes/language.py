@@ -39,27 +39,12 @@ def read_language(
     return language
 
 
-@router.get("/code/{code}", response_model=LanguagePublic)
-def read_language_by_code(
-    code: str,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user)
-):
-    """Get a specific language by ISO code - requires authentication"""
-    statement = select(Language).where(Language.code == code)
-    language = session.exec(statement).first()
-    if not language:
-        raise HTTPException(status_code=404, detail="Language not found")
-    return language
-
-
 @router.post("/", response_model=LanguagePublic)
 def create_language(
     language: LanguageCreate,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user)
+    session: SessionDep
 ):
-    """Create a new language - requires authentication"""
+    """Create a new language - no authentication for initial setup"""
     # Check if language with code already exists
     existing = session.exec(select(Language).where(Language.code == language.code)).first()
     if existing:

@@ -17,10 +17,6 @@ class JWTManager:
         """Create JWT access token for user"""
         expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
         
-        # Get user's language codes
-        native_lang_code = user.native_language.code if user.native_language else None
-        study_lang_code = user.study_language.code if user.study_language else None
-        
         payload = {
             # Standard claims
             "sub": str(user.id),
@@ -33,8 +29,6 @@ class JWTManager:
             "username": user.username,
             "email": user.email,
             "is_active": user.is_active,
-            "native_lang": native_lang_code,
-            "study_lang": study_lang_code,
             "scopes": ["user", "study"]
         }
         

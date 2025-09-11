@@ -2,17 +2,14 @@ from typing import Annotated, Generator
 from fastapi import Depends
 from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.pool import StaticPool
+from core.config import settings
 
-# Database URL for SQLite - use absolute path for container
-import os
-DATABASE_URL = "sqlite:////tmp/language_app.db"
-
-# Create engine with proper SQLite configuration
+# Create engine with proper SQLite configuration using environment variable
 engine = create_engine(
-    DATABASE_URL,
+    settings.database_url,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
-    echo=True  # Set to False in production
+    echo=settings.debug  # Echo SQL queries when DEBUG is enabled
 )
 
 

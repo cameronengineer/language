@@ -1,10 +1,10 @@
 import uuid
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session
 from database import get_session
 from models import User
 from auth.schemas import (
-    SocialLoginRequest, TokenResponse, RefreshTokenRequest, 
+    SimpleSocialLoginRequest, TokenResponse, RefreshTokenRequest,
     TokenRefreshResponse, UserWithProvider
 )
 from auth.jwt_manager import jwt_manager
@@ -26,9 +26,8 @@ router = APIRouter(
 
 @router.post("/social-login", response_model=TokenResponse)
 async def social_login(
-    request: SocialLoginRequest,
-    session: Session = Depends(get_session),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    request: SimpleSocialLoginRequest,
+    session: Session = Depends(get_session)
 ) -> TokenResponse:
     """
     Authenticate user via social login and return JWT tokens
@@ -40,17 +39,13 @@ async def social_login(
         # Create or get user
         user, is_new_user = await user_service.create_or_get_user_from_social(
             provider=request.provider.value,
-            token=request.token,
-            language_preferences=request.language_preferences.model_dump() if request.language_preferences else None
+            token=request.token
         )
         
         # Generate JWT tokens
         access_token = jwt_manager.create_access_token(user)
         refresh_token = jwt_manager.create_refresh_token(user)
         
-        # Background tasks for new users
-        if is_new_user:
-            background_tasks.add_task(log_new_user, user.email, request.provider.value)
         
         return TokenResponse(
             access_token=access_token,
@@ -138,22 +133,4 @@ async def get_current_user_profile(
     """
     Get current user profile with social provider info
     """
-    # Get primary provider (most recently used)
-    primary_provider = None
-    if current_user.social_accounts:
-        # Sort by created_at desc and get first
-        sorted_accounts = sorted(
-            current_user.social_accounts, 
-            key=lambda x: x.created_at, 
-            reverse=True
-        )
-        primary_provider = sorted_accounts[0].provider
-    
-    user_data = UserWithProvider.model_validate(current_user)
-    user_data.primary_provider = primary_provider
-    
-    return user_data
-
-def log_new_user(email: str, provider: str):
-    """Background task to log new user registration"""
-    logger.info(f"New user registered: {email} via {provider}")
+    return UserWithProvider.model_validate(current_user)

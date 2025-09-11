@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
 
 from database import create_db_and_tables
 from core.config import settings
@@ -19,6 +20,20 @@ from routes import (
 from routes.auth import router as auth_router
 
 
+# Configure logging based on DEBUG setting
+if settings.debug:
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+    logger.debug("Debug mode enabled")
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -27,11 +42,19 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     create_db_and_tables()
-    print("Database tables created")
+    if settings.debug:
+        print(f"Database tables created (DEBUG mode: {settings.debug})")
+        print(f"Database URL: {settings.database_url}")
+        print(f"Environment: {settings.app_env}")
+    else:
+        print("Database tables created")
     print("JWT Authentication enabled")
     yield
     # Shutdown
-    print("Shutting down")
+    if settings.debug:
+        print("Shutting down (DEBUG mode)")
+    else:
+        print("Shutting down")
 
 
 # Create FastAPI app
@@ -39,6 +62,7 @@ app = FastAPI(
     title=settings.api_title,
     description=settings.api_description,
     version=settings.api_version,
+    debug=settings.debug,  # Use DEBUG setting from environment
     lifespan=lifespan
 )
 
